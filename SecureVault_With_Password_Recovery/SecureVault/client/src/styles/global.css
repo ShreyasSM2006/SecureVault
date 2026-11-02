@@ -73,6 +73,17 @@ form .btn-primary { width: 100%; padding: .8rem; margin-top: .4rem; }
 .auth-card .btn { text-decoration: none; }
 .rules { list-style: none; padding: 0; margin: -.4rem 0 1rem; display: grid; gap: .25rem; font-size: .78rem; color: var(--muted); }
 .rules li { display: flex; gap: .4rem; align-items: center; } .rules li.ok { color: var(--green); }
+.lab-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-top: 1rem; }
+.lab-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.lab-grid .panel { margin-bottom: 0; }
+.strength { margin: 1rem 0; padding: .9rem; border-radius: 10px; display: grid; gap: .25rem; border: 1px solid; }
+.strength strong { font-size: 1.05rem; }.strength span { color: var(--muted); font-size: .85rem; }
+.strength-weak { border-color: rgba(239,68,68,.45); background: rgba(239,68,68,.08); }
+.strength-medium { border-color: rgba(245,158,11,.45); background: rgba(245,158,11,.08); }
+.strength-strong { border-color: rgba(34,197,94,.45); background: rgba(34,197,94,.08); }
+.charset { font-size: .82rem; color: var(--muted); }.comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.comparison div { padding: .9rem; border-radius: 10px; background: rgba(6,12,30,.45); }
+@media (max-width: 800px) { .lab-grid, .comparison { grid-template-columns: 1fr; } }
 .dev-otp { margin: 1.2rem 0 .8rem; padding: .9rem; border-radius: 12px; text-align: center; background: rgba(245,158,11,.08); border: 1px dashed rgba(245,158,11,.55); }
 .dev-tag { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: #fbbf24; }
 .dev-code { font-size: 2rem; font-weight: 700; letter-spacing: .5rem; margin: .3rem 0; font-variant-numeric: tabular-nums; }

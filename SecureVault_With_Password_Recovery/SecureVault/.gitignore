@@ -6,6 +6,10 @@ dist/
 # Secrets & runtime data - never commit
 server/keys/*
 !server/keys/.gitkeep
+server/certs/*.pem
+server/certs/*.key
+server/certs/*.crt
+*.pfx
 server/storage/*
 !server/storage/.gitkeep
 server/data/*.json

@@ -1,6 +1,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -32,6 +34,19 @@ app.use(session({
 }));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', maxFileSizeMb: config.maxFileSizeMb, otpTtlSeconds: config.otpTtlSeconds }));
+app.post(['/api/network/http', '/api/network/https'], (req, res) => {
+  const message = typeof req.body?.message === 'string' ? req.body.message.slice(0, 500) : '';
+  res.json({
+    protocol: req.secure || req.socket.encrypted ? 'HTTPS' : 'HTTP',
+    message,
+    echo: `SecureVault received: ${message}`,
+    tls: req.socket.encrypted ? {
+      version: req.socket.getProtocol(),
+      cipher: req.socket.getCipher()?.standardName || req.socket.getCipher()?.name || null,
+    } : { version: null, cipher: null },
+    localOnly: req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1',
+  });
+});
 app.use('/api', apiLimiter, originCheck, routes);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
 
@@ -59,11 +74,42 @@ async function start() {
   config.warnings.forEach((w) => console.warn(`[warn] ${w}`));
   if (generated) console.log('[setup] Generated new RSA-2048 key pair in', config.keysDir);
   return new Promise((resolve) => {
-    const server = app.listen(config.port, () => {
-      console.log(`SecureVault API listening on http://localhost:${config.port}`);
+    const certDir = path.join(config.root, 'certs');
+    const keyPath = path.join(certDir, 'localhost-key.pem');
+    const certPath = path.join(certDir, 'localhost-cert.pem');
+    const startListener = (server) => server.listen(config.port, '127.0.0.1', () => {
+      console.log(`SecureVault API listening on ${config.https ? 'https' : 'http'}://localhost:${config.port}`);
       if (!mailer.isConfigured()) console.warn('[warn] EMAIL_USER / EMAIL_APP_PASSWORD are not set in server/.env - login cannot send OTP emails until they are configured.');
       resolve(server);
     });
+    let server;
+    if (config.https) {
+      if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+        throw new Error(`Local TLS files are missing. Generate them in server/certs with ${path.basename(keyPath)} and ${path.basename(certPath)}.`);
+      }
+      server = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, app);
+    } else {
+      server = http.createServer(app);
+    }
+    startListener(server);
+
+    const labApp = express();
+    labApp.disable('x-powered-by');
+    labApp.use(express.json({ limit: '1kb' }));
+    labApp.post('/network/http', (req, res) => {
+      const remote = req.socket.remoteAddress;
+      if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) return res.status(403).json({ error: 'Local access only.' });
+      if (req.body && Object.keys(req.body).some((key) => /password|otp|document/i.test(key))) {
+        return res.status(400).json({ error: 'Sensitive fields are not accepted by the network lab.' });
+      }
+      const message = typeof req.body?.message === 'string' ? req.body.message.slice(0, 500) : '';
+      res.json({ protocol: 'HTTP', message, echo: `SecureVault HTTP lab received: ${message}`, tls: false, response: 'Delivered without TLS encryption.' });
+    });
+    if (config.env !== 'test' && process.env.SECUREVAULT_DISABLE_NETWORK_LAB !== '1') {
+      http.createServer(labApp).listen(config.httpLabPort, '127.0.0.1', () => {
+        console.log(`Network Security HTTP lab listening on http://localhost:${config.httpLabPort}`);
+      });
+    }
   });
 }
 

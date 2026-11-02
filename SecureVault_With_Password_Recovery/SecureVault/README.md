@@ -122,14 +122,26 @@ If `bcrypt` fails to install, use a current Node LTS (bcrypt 6 ships prebuilt bi
 Open **two terminals** in the `SecureVault` folder:
 
 ```bat
-:: Terminal 1 - backend (http://localhost:5000)
+:: Terminal 1 - HTTPS backend (https://localhost:5000)
 npm run server
 
-:: Terminal 2 - frontend (http://localhost:5173)
+:: Terminal 2 - HTTPS frontend (https://localhost:5173)
 npm run client
 ```
 
-Open **http://localhost:5173**. The Vite dev server proxies `/api` to the backend, so the session cookie is same-origin.
+Open **https://localhost:5173**. Accept the browser's local certificate warning for the same self-signed certificate used by
+Vite and Express. The Vite dev server proxies `/api` to the HTTPS backend, so application requests remain same-origin.
+
+The local HTTP network-lab endpoint is **http://localhost:5001/network/http** and is reachable only from loopback.
+It accepts only synthetic `message` values and rejects keys resembling passwords, OTPs, or documents. The API HTTPS
+network endpoint is **https://localhost:5000/api/network/https**.
+
+For a new local certificate, run:
+
+```bat
+cd server\certs
+openssl req -x509 -newkey rsa:2048 -nodes -keyout localhost-key.pem -out localhost-cert.pem -sha256 -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+```
 
 **Single-process alternative:** `npm run build`, then `npm run server`, and open http://localhost:5000
 (Express serves the built React app).

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { FileLock2, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Upload, X } from 'lucide-react';
+import { FileLock2, LayoutDashboard, LogOut, Menu, Network, ScrollText, ShieldCheck, Upload, X, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Spinner } from './ui';
 
@@ -9,6 +9,8 @@ const NAV = [
   { to: '/upload', label: 'Upload Document', icon: Upload },
   { to: '/documents', label: 'My Documents', icon: FileLock2 },
   { to: '/logs', label: 'Security Logs', icon: ScrollText },
+  { to: '/network-security-lab', label: 'Network Security Lab', icon: Network },
+  { to: '/password-security-lab', label: 'Password Security Lab', icon: KeyRound },
 ];
 
 export default function Layout() {

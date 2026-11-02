@@ -17,7 +17,8 @@ const SMTP_PORT = 2526;
 const MAIL_USER = 'vault.sender@gmail.com';
 const MAIL_PASS_SPACED = 'abcd efgh ijkl mnop'; // Google displays app passwords with spaces; the server must strip them
 const COOLDOWN = 2;
-const BASE = `http://localhost:${PORT}/api`;
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+const BASE = `https://localhost:${PORT}/api`;
 const TTL = 4;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'securevault-test-'));
 const dirs = { data: path.join(tmp, 'data'), storage: path.join(tmp, 'storage'), keys: path.join(tmp, 'keys') };
@@ -111,7 +112,7 @@ async function main() {
       AUTH_RATE_LIMIT_MAX: '1000', BCRYPT_ROUNDS: '4', MAX_FILE_SIZE_MB: '1',
       EMAIL_USER: MAIL_USER, EMAIL_APP_PASSWORD: MAIL_PASS_SPACED, SMTP_HOST: '127.0.0.1', SMTP_PORT: String(SMTP_PORT), SMTP_SECURE: 'false',
       OTP_RESEND_COOLDOWN_SECONDS: String(COOLDOWN), RESEND_RATE_LIMIT_MAX: '1000',
-      CLIENT_ORIGIN: 'http://localhost:5173', NODE_ENV: 'development',
+      CLIENT_ORIGIN: 'http://localhost:5173', NODE_ENV: 'development', SECUREVAULT_DISABLE_NETWORK_LAB: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -316,12 +317,12 @@ async function main() {
     const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'securevault-test2-'));
     const s2 = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
       env: { ...process.env, PORT: '5056', DATA_DIR: path.join(tmp2, 'd'), STORAGE_DIR: path.join(tmp2, 's'), KEYS_DIR: path.join(tmp2, 'k'),
-        SESSION_SECRET: 't', OTP_HMAC_SECRET: 't', BCRYPT_ROUNDS: '4', EMAIL_USER: '', EMAIL_APP_PASSWORD: '', AUTH_RATE_LIMIT_MAX: '1000' },
+        SESSION_SECRET: 't', OTP_HMAC_SECRET: 't', BCRYPT_ROUNDS: '4', EMAIL_USER: '', EMAIL_APP_PASSWORD: '', AUTH_RATE_LIMIT_MAX: '1000', SECUREVAULT_DISABLE_NETWORK_LAB: '1' },
       stdio: 'ignore',
     });
     try {
-      for (let i = 0; i < 60; i++) { try { if ((await fetch('http://localhost:5056/api/health')).ok) break; } catch {} await sleep(250); }
-      const post = (u, body) => fetch('http://localhost:5056/api' + u, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      for (let i = 0; i < 60; i++) { try { if ((await fetch('https://localhost:5056/api/health')).ok) break; } catch {} await sleep(250); }
+      const post = (u, body) => fetch('https://localhost:5056/api' + u, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       await post('/auth/register', { username: 'carol', email: 'carol@example.com', password: 'Str0ngPass!' });
       const lr = await post('/auth/login', { username: 'carol', password: 'Str0ngPass!' });
       const lj = await lr.json();

@@ -10,6 +10,8 @@ import Dashboard from './pages/Dashboard';
 import UploadDocument from './pages/UploadDocument';
 import MyDocuments from './pages/MyDocuments';
 import SecurityLogs from './pages/SecurityLogs';
+import NetworkSecurityLab from './pages/NetworkSecurityLab';
+import PasswordSecurityLab from './pages/PasswordSecurityLab';
 
 export default function App() {
   return (
@@ -27,6 +29,8 @@ export default function App() {
           <Route path="/upload" element={<UploadDocument />} />
           <Route path="/documents" element={<MyDocuments />} />
           <Route path="/logs" element={<SecurityLogs />} />
+          <Route path="/network-security-lab" element={<NetworkSecurityLab />} />
+          <Route path="/password-security-lab" element={<PasswordSecurityLab />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
