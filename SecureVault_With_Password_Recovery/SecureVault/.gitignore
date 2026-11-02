@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Secrets & runtime data - never commit
+server/keys/*
+!server/keys/.gitkeep
+server/storage/*
+!server/storage/.gitkeep
+server/data/*.json
+server/data/*.tmp
