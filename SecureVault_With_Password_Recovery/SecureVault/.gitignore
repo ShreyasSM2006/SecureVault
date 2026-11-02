@@ -10,6 +10,8 @@ server/certs/*.pem
 server/certs/*.key
 server/certs/*.crt
 *.pfx
+/localhost+2.pem
+/localhost+2-key.pem
 server/storage/*
 !server/storage/.gitkeep
 server/data/*.json

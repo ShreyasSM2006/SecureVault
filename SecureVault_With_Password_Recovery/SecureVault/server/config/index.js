@@ -25,8 +25,11 @@ module.exports = {
   port: int(process.env.PORT, 5000),
   httpLabPort: int(process.env.HTTP_LAB_PORT, 5001),
   https: process.env.HTTPS !== 'false',
-  clientOrigins: (process.env.CLIENT_ORIGIN || 'https://localhost:5173,http://localhost:5173')
-    .split(',').map((s) => s.trim()).filter(Boolean),
+  clientOrigins: [...new Set([
+    'https://localhost:5173',
+    'http://localhost:5173',
+    ...(process.env.CLIENT_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean),
+  ])],
   dataDir: dir(process.env.DATA_DIR, 'data'),
   storageDir,
   tmpDir: path.join(storageDir, '_tmp'),

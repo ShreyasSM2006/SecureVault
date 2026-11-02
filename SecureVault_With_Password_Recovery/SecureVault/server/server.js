@@ -74,9 +74,8 @@ async function start() {
   config.warnings.forEach((w) => console.warn(`[warn] ${w}`));
   if (generated) console.log('[setup] Generated new RSA-2048 key pair in', config.keysDir);
   return new Promise((resolve) => {
-    const certDir = path.join(config.root, 'certs');
-    const keyPath = path.join(certDir, 'localhost-key.pem');
-    const certPath = path.join(certDir, 'localhost-cert.pem');
+    const keyPath = path.resolve(config.root, '..', 'localhost+2-key.pem');
+    const certPath = path.resolve(config.root, '..', 'localhost+2.pem');
     const startListener = (server) => server.listen(config.port, '127.0.0.1', () => {
       console.log(`SecureVault API listening on ${config.https ? 'https' : 'http'}://localhost:${config.port}`);
       if (!mailer.isConfigured()) console.warn('[warn] EMAIL_USER / EMAIL_APP_PASSWORD are not set in server/.env - login cannot send OTP emails until they are configured.');
@@ -85,7 +84,7 @@ async function start() {
     let server;
     if (config.https) {
       if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
-        throw new Error(`Local TLS files are missing. Generate them in server/certs with ${path.basename(keyPath)} and ${path.basename(certPath)}.`);
+        throw new Error(`Local TLS files are missing: ${certPath} and ${keyPath}`);
       }
       server = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, app);
     } else {
