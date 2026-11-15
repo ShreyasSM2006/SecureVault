@@ -16,6 +16,10 @@ const { apiLimiter, originCheck } = require('./middleware/security');
 
 const app = express();
 app.disable('x-powered-by');
+
+if (config.isProd) {
+  app.set('trust proxy', 1);
+}
 app.use(helmet());
 app.use(cors({ origin: config.clientOrigins, credentials: true }));
 app.use(express.json({ limit: '100kb' }));
@@ -73,43 +77,89 @@ async function start() {
   const { generated } = await sec.loadKeys();
   config.warnings.forEach((w) => console.warn(`[warn] ${w}`));
   if (generated) console.log('[setup] Generated new RSA-2048 key pair in', config.keysDir);
-  return new Promise((resolve) => {
-    const keyPath = path.resolve(config.root, '..', 'localhost+2-key.pem');
-    const certPath = path.resolve(config.root, '..', 'localhost+2.pem');
-    const startListener = (server) => server.listen(config.port, '127.0.0.1', () => {
-      console.log(`SecureVault API listening on ${config.https ? 'https' : 'http'}://localhost:${config.port}`);
-      if (!mailer.isConfigured()) console.warn('[warn] EMAIL_USER / EMAIL_APP_PASSWORD are not set in server/.env - login cannot send OTP emails until they are configured.');
+return new Promise((resolve, reject) => {
+  const startListener = (server, port, host, label) => {
+    server.once('error', reject);
+    server.listen(port, host, () => {
+      server.removeListener('error', reject);
+      console.log(`${label} listening on ${host}:${port}`);
       resolve(server);
     });
-    let server;
-    if (config.https) {
-      if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
-        throw new Error(`Local TLS files are missing: ${certPath} and ${keyPath}`);
-      }
-      server = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, app);
-    } else {
-      server = http.createServer(app);
-    }
-    startListener(server);
+  };
 
-    const labApp = express();
-    labApp.disable('x-powered-by');
-    labApp.use(express.json({ limit: '1kb' }));
-    labApp.post('/network/http', (req, res) => {
-      const remote = req.socket.remoteAddress;
-      if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) return res.status(403).json({ error: 'Local access only.' });
-      if (req.body && Object.keys(req.body).some((key) => /password|otp|document/i.test(key))) {
-        return res.status(400).json({ error: 'Sensitive fields are not accepted by the network lab.' });
-      }
-      const message = typeof req.body?.message === 'string' ? req.body.message.slice(0, 500) : '';
-      res.json({ protocol: 'HTTP', message, echo: `SecureVault HTTP lab received: ${message}`, tls: false, response: 'Delivered without TLS encryption.' });
-    });
-    if (config.env !== 'test' && process.env.SECUREVAULT_DISABLE_NETWORK_LAB !== '1') {
-      http.createServer(labApp).listen(config.httpLabPort, '127.0.0.1', () => {
-        console.log(`Network Security HTTP lab listening on http://localhost:${config.httpLabPort}`);
+  let server;
+
+  if (config.isProd) {
+    server = http.createServer(app);
+    startListener(server, config.port, '0.0.0.0', 'SecureVault API');
+
+    if (!mailer.isConfigured()) {
+      console.warn('[warn] Email credentials are not configured.');
+    }
+    return;
+  }
+
+  const keyPath = path.resolve(config.root, '..', 'localhost+2-key.pem');
+  const certPath = path.resolve(config.root, '..', 'localhost+2.pem');
+
+  if (config.https) {
+    if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+      return reject(new Error('Local TLS certificate files are missing.'));
+    }
+
+    server = https.createServer({
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath),
+    }, app);
+  } else {
+    server = http.createServer(app);
+  }
+
+  startListener(server, config.port, '127.0.0.1', 'SecureVault API');
+
+  const labApp = express();
+  labApp.disable('x-powered-by');
+  labApp.use(express.json({ limit: '1kb' }));
+
+  labApp.post('/network/http', (req, res) => {
+    const remote = req.socket.remoteAddress;
+
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) {
+      return res.status(403).json({ error: 'Local access only.' });
+    }
+
+    if (req.body && Object.keys(req.body).some(
+      (key) => /password|otp|document/i.test(key)
+    )) {
+      return res.status(400).json({
+        error: 'Sensitive fields are not accepted by the network lab.',
       });
     }
+
+    const message = typeof req.body?.message === 'string'
+      ? req.body.message.slice(0, 500)
+      : '';
+
+    res.json({
+      protocol: 'HTTP',
+      message,
+      echo: `SecureVault HTTP lab received: ${message}`,
+      tls: false,
+      response: 'Delivered without TLS encryption.',
+    });
   });
+
+  if (config.env !== 'test' &&
+      process.env.SECUREVAULT_DISABLE_NETWORK_LAB !== '1') {
+    http.createServer(labApp).listen(config.httpLabPort, '127.0.0.1', () => {
+      console.log(`Network Security HTTP lab listening on localhost:${config.httpLabPort}`);
+    });
+  }
+
+  if (!mailer.isConfigured()) {
+    console.warn('[warn] Email credentials are not configured.');
+  }
+});
 }
 
 if (require.main === module) {

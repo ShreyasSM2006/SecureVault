@@ -24,7 +24,9 @@ module.exports = {
   isProd: process.env.NODE_ENV === 'production',
   port: int(process.env.PORT, 5000),
   httpLabPort: int(process.env.HTTP_LAB_PORT, 5001),
-  https: process.env.HTTPS !== 'false',
+  https: process.env.NODE_ENV === 'production'
+  ? false
+  : process.env.HTTPS !== 'false',
   clientOrigins: [...new Set([
     'https://localhost:5173',
     'http://localhost:5173',
@@ -38,7 +40,9 @@ module.exports = {
   sessionSecret: secret('SESSION_SECRET'),
   otpSecret: secret('OTP_HMAC_SECRET'),
   keyPassphrase: process.env.KEY_PASSPHRASE || '',
-  cookieSecure: process.env.HTTPS !== 'false' || process.env.COOKIE_SECURE === 'true',
+  cookieSecure: process.env.NODE_ENV === 'production'
+  ? true
+  : process.env.HTTPS !== 'false' || process.env.COOKIE_SECURE === 'true',
   sessionMinutes: int(process.env.SESSION_MINUTES, 30),
   otpTtlSeconds: int(process.env.OTP_TTL_SECONDS, 120),
   otpMaxAttempts: 3,
