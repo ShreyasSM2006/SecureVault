@@ -5,9 +5,10 @@ const nodemailer = require('nodemailer');
 const config = require('../config');
 
 let transporter;
-
-const isConfigured = () => Boolean(config.emailUser && config.emailAppPassword);
-
+const resendApiKey = process.env.RESEND_API_KEY || '';
+const resendFrom = process.env.EMAIL_FROM || 'SecureVault <onboarding@resend.dev>';
+const isConfigured = () =>
+  Boolean(resendApiKey || (config.emailUser && config.emailAppPassword));
 function getTransporter() {
   if (!transporter) {
     transporter = nodemailer.createTransport({
@@ -22,7 +23,53 @@ function getTransporter() {
   }
   return transporter;
 }
+async function deliverEmail(message, label) {
+  try {
+    // Use Resend whenever an API key is configured.
+    if (resendApiKey) {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...message,
+          from: resendFrom,
+        }),
+      });
 
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          `Resend API error (${response.status}): ${result.message || JSON.stringify(result)}`
+        );
+      }
+
+      console.log(`[mail] ${label} email accepted by Resend. ID: ${result.id}`);
+      return true;
+    }
+
+    // Local-development fallback: Gmail SMTP.
+    const info = await getTransporter().sendMail(message);
+
+    if (!info.accepted || !info.accepted.length) {
+      throw new Error('Recipient was not accepted by the SMTP server');
+    }
+
+    console.log(`[mail] ${label} email accepted by Gmail SMTP`);
+    return true;
+
+  } catch (err) {
+    console.error(`[mail] ${label} email failed:`, err.code || '', err.message);
+
+    throw new MailError(
+      'Email delivery failed',
+      'EMAIL_SEND_FAILED'
+    );
+  }
+}
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // "john.doe@gmail.com" -> "j*******@gmail.com"
@@ -69,7 +116,13 @@ function buildMessage({ to, username, otp, ttlSeconds }) {
     </td></tr>
   </table>
 </body></html>`;
-  return { from: `"SecureVault" <${config.emailUser}>`, to, subject, text, html };
+  return {
+  from: resendApiKey ? resendFrom : `"SecureVault" <${config.emailUser}>`,
+  to,
+  subject,
+  text,
+  html,
+};
 }
 
 class MailError extends Error {
@@ -78,16 +131,14 @@ class MailError extends Error {
 
 // Resolves only when the SMTP server has accepted the message for the recipient.
 async function sendOtpEmail({ to, username, otp, ttlSeconds }) {
-  if (!isConfigured()) throw new MailError('Email service is not configured', 'EMAIL_NOT_CONFIGURED');
-  try {
-    const info = await getTransporter().sendMail(buildMessage({ to, username, otp, ttlSeconds }));
-    if (!info.accepted || !info.accepted.length) throw new Error('Recipient was not accepted by the SMTP server');
-    return true;
-  } catch (err) {
-    // Log the reason server-side (never the OTP or credentials); give the client a generic message.
-    console.error('[mail] OTP email failed:', err.code || err.responseCode || '', err.message);
-    throw new MailError('Email delivery failed', err instanceof MailError ? err.code : 'EMAIL_SEND_FAILED');
+  if (!isConfigured()) {
+    throw new MailError('Email service is not configured', 'EMAIL_NOT_CONFIGURED');
   }
+
+  return deliverEmail(
+    buildMessage({ to, username, otp, ttlSeconds }),
+    'OTP'
+  );
 }
 
 
@@ -110,19 +161,24 @@ function buildPasswordResetMessage({ to, username, otp, ttlSeconds }) {
       <p>This code expires in <strong>${esc(minutes)}</strong>. You have 3 attempts.</p>
       <p style="font-size:12px;color:#8b9bc4;">If you did not request this, ignore this email. Your password will remain unchanged. Never share this code.</p>
     </div></body></html>`;
-  return { from: `"SecureVault" <${config.emailUser}>`, to, subject, text, html };
+  return {
+  from: resendApiKey ? resendFrom : `"SecureVault" <${config.emailUser}>`,
+  to,
+  subject,
+  text,
+  html,
+};
 }
 
 async function sendPasswordResetEmail({ to, username, otp, ttlSeconds }) {
-  if (!isConfigured()) throw new MailError('Email service is not configured', 'EMAIL_NOT_CONFIGURED');
-  try {
-    const info = await getTransporter().sendMail(buildPasswordResetMessage({ to, username, otp, ttlSeconds }));
-    if (!info.accepted || !info.accepted.length) throw new Error('Recipient was not accepted by the SMTP server');
-    return true;
-  } catch (err) {
-    console.error('[mail] Password reset email failed:', err.code || err.responseCode || '', err.message);
-    throw new MailError('Email delivery failed', err instanceof MailError ? err.code : 'EMAIL_SEND_FAILED');
+  if (!isConfigured()) {
+    throw new MailError('Email service is not configured', 'EMAIL_NOT_CONFIGURED');
   }
+
+  return deliverEmail(
+    buildPasswordResetMessage({ to, username, otp, ttlSeconds }),
+    'Password reset'
+  );
 }
 
 module.exports = { sendOtpEmail, sendPasswordResetEmail, isConfigured, maskEmail, MailError };
